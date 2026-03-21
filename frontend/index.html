@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ASR + Diarization</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; }
+        .segment { margin-bottom: 12px; }
+        .speaker { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>ASR + Diarization</h1>
+    <input type="file" id="audioFile" accept="audio/*" />
+    <button id="processBtn">Process</button>
+    <div id="status"></div>
+    <div id="output"></div>
+
+    <script>
+    const button = document.getElementById('processBtn');
+    const status = document.getElementById('status');
+    const output = document.getElementById('output');
+
+    button.onclick = async () => {
+        const file = document.getElementById('audioFile').files[0];
+        if (!file) return alert('Choose audio file first');
+
+        const form = new FormData();
+        form.append('upload_file', file);
+
+        status.innerText = 'Uploading & processing...';
+        output.innerHTML = '';
+
+        try {
+            const res = await fetch('http://localhost:8000/transcribe', {
+                method: 'POST',
+                body: form,
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Error');
+
+            status.innerText = 'Done';
+            data.segments.forEach(segment => {
+                const div = document.createElement('div');
+                div.className = 'segment';
+                div.innerHTML = `<span class="speaker">${segment.speaker}</span> [${segment.start.toFixed(2)}-${segment.end.toFixed(2)}]: ${segment.text}`;
+                output.appendChild(div);
+            });
+        } catch (err) {
+            status.innerText = 'Failed: ' + err.message;
+        }
+    };
+    </script>
+</body>
+</html>
