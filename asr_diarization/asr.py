@@ -1,7 +1,7 @@
 import librosa
 from transformers import pipeline
 
-MODEL_NAME = "anish-shilpakar/wav2vec2-nepali"
+MODEL_NAME = "lishantKarki/wav2vec2-large-xls-r-300m-nepali-openslr2"
 _asr_pipe = None
 
 

@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+librosa
+transformers
+resemblyzer
+spectralcluster
+pyannote.core
+pyannote.metrics
+python-multipart
+soundfile
+torch
+numpy
+matplotlib

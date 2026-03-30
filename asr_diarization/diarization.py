@@ -4,11 +4,9 @@ from resemblyzer import VoiceEncoder
 from spectralcluster import SpectralClusterer
 from pyannote.core import Annotation, Segment
 
-# ------------ CONFIG ----------------
 SAMPLE_RATE = 16000
-WINDOW = 1.5     # window size in seconds
-STEP = 0.75      # step size in seconds
-# ------------------------------------
+WINDOW = 1
+STEP = 1
 
 
 def extract_embeddings(audio_path):
@@ -39,8 +37,7 @@ def cluster_embeddings(embeddings, min_clusters=2, max_clusters=10):
         max_clusters=max_clusters,
         autotune=None
     )
-    labels = clusterer.predict(embeddings)
-    return labels
+    return clusterer.predict(embeddings)
 
 
 def build_rttm(segments, labels):
@@ -61,5 +58,8 @@ def diarize(audio_path, min_spk=2, max_spk=3):
 
     print("Building RTTM...")
     ann = build_rttm(seg, labels)
-    print("Diarization done.")
+
+    print("Diarization done.\n")
+    print(ann)
+
     return ann
