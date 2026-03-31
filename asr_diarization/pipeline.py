@@ -1,10 +1,47 @@
 import librosa
 from .asr import transcribe_audio_waveform
 from .diarization import diarize
+from pyannote.core import Annotation, Segment
+
+
+def merge_adjacent_segments(ann):
+    """
+    Merge overlapping or adjacent segments with the same speaker.
+    Fixes duplicate transcriptions from overlapping diarization windows.
+    """
+    merged = Annotation()
+    
+    tracks = list(ann.itertracks(yield_label=True))
+    if not tracks:
+        return merged
+    
+    current_segment, _, current_label = tracks[0]
+    current_start = current_segment.start
+    current_end = current_segment.end
+    
+    for segment, _, label in tracks[1:]:
+        if label == current_label and segment.start <= current_end + 0.1:  # 100ms tolerance
+            # Merge: extend current segment
+            current_end = max(current_end, segment.end)
+        else:
+            # Different speaker or gap detected: save current and start new
+            merged[Segment(current_start, current_end)] = current_label
+            current_segment = segment
+            current_start = segment.start
+            current_end = segment.end
+            current_label = label
+    
+    # Save the last segment
+    merged[Segment(current_start, current_end)] = current_label
+    return merged
 
 
 def run_asr_diarization(audio_path, min_spk=2, max_spk=3):
     ann = diarize(audio_path, min_spk=min_spk, max_spk=max_spk)
+    
+    # Merge overlapping segments to avoid duplicate transcriptions
+    ann = merge_adjacent_segments(ann)
+    
     y, sr = librosa.load(audio_path, sr=16000)
 
     results = []

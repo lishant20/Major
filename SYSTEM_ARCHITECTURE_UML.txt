@@ -1,0 +1,154 @@
+@startuml Nepali_ASR_Diarization_Architecture
+
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam classBackgroundColor #F0F0F0
+skinparam classBorderColor #333333
+
+title Nepali ASR + Speaker Diarization System Architecture
+
+package "Frontend" {
+    component [Web UI\n(HTML/JavaScript)] as WebUI
+    component [Audio File Input] as AudioInput
+    component [File Validation] as FileValidator
+}
+
+package "Backend API" {
+    component [FastAPI Server\n(main.py)] as FastAPI
+    component [/transcribe Endpoint] as TranscribeEndpoint
+    component [/health Endpoint] as HealthEndpoint
+    component [CORS Middleware] as CORSMiddleware
+    component [Error Handler] as ErrorHandler
+}
+
+package "ASR Module" {
+    component [ASR Pipeline\n(asr.py)] as ASRPipeline
+    component [wav2vec2-nepali Model] as Wav2Vec2Model
+    component [Transformers Library] as Transformers
+    component [Audio Resampler\n(16kHz)] as Resampler
+}
+
+package "Diarization Module" {
+    component [Diarization Pipeline\n(diarization.py)] as DiarizationPipeline
+    component [Voice Activity Detection\n(webrtcvad)] as VAD
+    component [Embedding Extractor\n(resemblyzer)] as Embeddings
+    component [Speaker Encoder] as SpeakerEncoder
+    component [Spectral Clusterer] as SpectralClusterer
+    component [Label Smoother] as LabelSmoother
+}
+
+package "Orchestration" {
+    component [Main Pipeline\n(pipeline.py)] as MainPipeline
+    component [Segment Merger] as SegmentMerger
+    component [Audio Loader\n(librosa)] as AudioLoader
+}
+
+package "Evaluation" {
+    component [DER Calculator\n(evaluation.py)] as DERCalc
+    component [Pyannote Metrics] as PyannoteMetrics
+    component [DER Plotter] as DERPlotter
+}
+
+package "Data Models" {
+    class AudioFile {
+        - filename: str
+        - format: str
+        - sample_rate: int
+        - duration: float
+        - data: numpy.array
+    }
+    
+    class TranscriptionSegment {
+        - speaker: str
+        - start_time: float
+        - end_time: float
+        - text: str
+    }
+    
+    class DiarizationResult {
+        - segments: List[Segment]
+        - speaker_labels: List[str]
+        - timestamps: List[Tuple]
+    }
+    
+    class TranscriptionResult {
+        - full_transcript: str
+        - segments: List[TranscriptionSegment]
+        - source_filename: str
+        - duration: float
+    }
+    
+    class Annotation {
+        - speaker: str
+        - start: float
+        - end: float
+    }
+}
+
+' Frontend to Backend
+WebUI --> FileValidator : User selects file
+FileValidator --> AudioInput : Validate format
+AudioInput --> TranscribeEndpoint : POST /transcribe\n(multipart/form-data)
+
+' Backend Processing
+TranscribeEndpoint --> ErrorHandler : Catch exceptions
+TranscribeEndpoint --> CORSMiddleware : CORS handling
+TranscribeEndpoint --> MainPipeline : run_asr_diarization()
+
+' Main Pipeline orchestration
+MainPipeline --> AudioLoader : Load audio file
+AudioLoader --> AudioFile : Create audio object
+AudioFile --> DiarizationPipeline : Process for diarization
+AudioFile --> ASRPipeline : Process for transcription
+
+' Diarization Flow
+DiarizationPipeline --> VAD : Filter silence
+VAD --> Embeddings : Extract speaker embeddings
+Embeddings --> SpeakerEncoder : Generate embeddings
+SpeakerEncoder --> SpectralClusterer : Cluster speakers
+SpectralClusterer --> LabelSmoother : Smooth labels
+LabelSmoother --> DiarizationResult : Return speaker segments
+DiarizationResult --> Annotation : Create annotations
+
+' ASR Flow
+ASRPipeline --> Resampler : Resample to 16kHz
+Resampler --> Wav2Vec2Model : Inference
+Wav2Vec2Model --> Transformers : HuggingFace pipeline
+Transformers --> TranscriptionSegment : Extract text
+
+' Segment Processing
+Annotation --> SegmentMerger : Get speaker boundaries
+DiarizationResult --> SegmentMerger : Merge overlapping segments
+SegmentMerger --> MainPipeline : Merged segments
+
+' Result Assembly
+MainPipeline --> TranscriptionResult : Combine ASR + Diarization
+TranscriptionResult --> TranscribeEndpoint : Return JSON
+TranscribeEndpoint --> WebUI : HTTP 200 + JSON
+
+' Evaluation (Optional)
+DiarizationResult --> DERCalc : Hypothesis annotation
+Annotation --> DERCalc : Reference annotation
+DERCalc --> PyannoteMetrics : Calculate DER/Confusion/etc
+PyannoteMetrics --> DERPlotter : Plot results
+
+' Error handling
+ErrorHandler --> TranscribeEndpoint : 400/422/500 responses
+
+' Libraries and Models
+Wav2Vec2Model -.-> "huggingface-hub" : Load model
+SpeakerEncoder -.-> "resemblyzer" : Load encoder
+SpectralClusterer -.-> "spectralcluster" : Clustering
+VAD -.-> "webrtcvad" : Voice detection
+AudioLoader -.-> "librosa" : Audio processing
+
+legend right
+    | Component Type | Color |
+    | Frontend | Orchid |
+    | API Layer | LightBlue |
+    | Processing | LightGreen |
+    | Models | LightCoral |
+    | Data | LightYellow |
+end legend
+
+@enduml
